@@ -21,6 +21,7 @@ ya pkg add js0ny/dump-tabs
 With Home-Manager:
 
 ```nix
+# manual install
 { pkgs, ... }: {
   programs.yazi.plugins = {
     dump-tabs = (
@@ -40,6 +41,22 @@ With Home-Manager:
         '';
       }
     );
+  };
+}
+# with flake (if you wish)
+# flake.nix
+{
+  inputs = {
+    yazi-dump-tabs = {
+      url = "github:js0ny/dump-tabs.yazi";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+}
+# home-manager
+{
+  programs.yazi.plugins = {
+    dump-tabs = inputs.yazi-dump-tabs.packages.${pkgs.stdenv.hostPlatform.system}.default;
   };
 }
 ```
@@ -203,3 +220,7 @@ Then inspect:
 ```sh
 ~/.local/state/yazi/yazi.log
 ```
+
+## TODO
+
+- [ ] Check availability on Windows & Update documentations
