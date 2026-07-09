@@ -1,12 +1,13 @@
 --- @sync entry
 
-local function default_output()
+local function default_output(format)
 	local home = os.getenv("HOME")
+	local name = format == "nul" and "tabs.nul" or "tabs.dump"
 	if home and home ~= "" then
-		return home .. "/.local/state/yazi/tabs.dump"
+		return home .. "/.local/state/yazi/" .. name
 	end
 
-	return "/tmp/yazi-tabs.dump"
+	return "/tmp/yazi-" .. name
 end
 
 local function truthy(value)
@@ -17,7 +18,7 @@ local function dirname(path)
 	return path:match("^(.+)/[^/]+$")
 end
 
-local function shell_escape(value)
+local function shell_escape_field(value)
 	if value == nil then
 		return "-"
 	end
@@ -27,9 +28,8 @@ local function shell_escape(value)
 		return "-"
 	end
 
-	-- Backslash-escape fields so the default space separator remains parseable.
-	-- This is intentionally close to shell escaping, while keeping the output
-	-- compact and easy to read: `/path/with space` -> `/path/with\ space`.
+	-- Backslash-escape fields so the default space separator remains parseable
+	-- for humans/debugging. For machine restore, prefer --format=cmd or --format=nul.
 	s = s:gsub("\\", "\\\\")
 	s = s:gsub("\n", "\\n")
 	s = s:gsub("\r", "\\r")
@@ -37,6 +37,12 @@ local function shell_escape(value)
 	s = s:gsub(" ", "\\ ")
 
 	return s
+end
+
+local function sh_quote(value)
+	local s = tostring(value or "")
+	-- POSIX single-quote escaping: abc'def -> 'abc'\''def'
+	return "'" .. s:gsub("'", "'\\''") .. "'"
 end
 
 local function debug_log(enabled, message)
@@ -53,7 +59,12 @@ local function debug_log(enabled, message)
 	}
 end
 
-local function collect_tabs(sep)
+local function tab_target(tab)
+	local hovered = tab.current.hovered
+	return hovered and tostring(hovered.url) or tostring(tab.current.cwd)
+end
+
+local function collect_table(sep)
 	local lines = {}
 
 	for i = 1, #cx.tabs do
@@ -62,11 +73,11 @@ local function collect_tabs(sep)
 		local hovered = current.hovered
 
 		local fields = {
-			shell_escape(i),
-			shell_escape(i == cx.tabs.idx and "active" or "-"),
-			shell_escape(tab.name),
-			shell_escape(current.cwd),
-			shell_escape(hovered and hovered.url or nil),
+			shell_escape_field(i),
+			shell_escape_field(i == cx.tabs.idx and "active" or "-"),
+			shell_escape_field(tab.name),
+			shell_escape_field(current.cwd),
+			shell_escape_field(hovered and hovered.url or nil),
 		}
 
 		lines[#lines + 1] = table.concat(fields, sep)
@@ -75,16 +86,55 @@ local function collect_tabs(sep)
 	return table.concat(lines, "\n") .. "\n", #cx.tabs, cx.tabs.idx
 end
 
+local function collect_lines()
+	local lines = {}
+	for i = 1, #cx.tabs do
+		lines[#lines + 1] = tab_target(cx.tabs[i])
+	end
+	return table.concat(lines, "\n") .. "\n", #cx.tabs, cx.tabs.idx
+end
+
+local function collect_nul()
+	local parts = {}
+	for i = 1, #cx.tabs do
+		parts[#parts + 1] = tab_target(cx.tabs[i])
+	end
+	return table.concat(parts, "\0") .. "\0", #cx.tabs, cx.tabs.idx
+end
+
+local function collect_cmd()
+	local parts = { "yazi" }
+	for i = 1, #cx.tabs do
+		parts[#parts + 1] = sh_quote(tab_target(cx.tabs[i]))
+	end
+	return table.concat(parts, " ") .. "\n", #cx.tabs, cx.tabs.idx
+end
+
+local function collect_tabs(format, sep)
+	if format == "table" then
+		return collect_table(sep)
+	elseif format == "lines" then
+		return collect_lines()
+	elseif format == "nul" then
+		return collect_nul()
+	elseif format == "cmd" then
+		return collect_cmd()
+	else
+		error("unknown format: " .. tostring(format))
+	end
+end
+
 return {
 	entry = function(_, job)
 		local args = job.args or {}
-		local output = args.output or args[1] or default_output()
+		local format = args.format or args.fmt or "table"
+		local output = args.output or args[1] or default_output(format)
 		local sep = args.sep or " "
 		local debug = truthy(args.debug)
 
-		debug_log(debug, "start output=" .. output .. " sep=" .. sep)
+		debug_log(debug, "start output=" .. output .. " format=" .. format .. " sep=" .. sep)
 
-		local ok_collect, data, count, active = pcall(collect_tabs, sep)
+		local ok_collect, data, count, active = pcall(collect_tabs, format, sep)
 		if not ok_collect then
 			ya.err("dump-tabs collect failed: " .. tostring(data))
 			ya.notify {

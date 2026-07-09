@@ -2,36 +2,10 @@
 
 A small [Yazi](https://yazi-rs.github.io/) plugin that dumps all open tabs to a file.
 
-By default it writes a space-separated file and backslash-escapes spaces in fields, so paths like `/home/me/a b` become `/home/me/a\ b`.
+It has two main use cases:
 
-## Output
-
-Default output path:
-
-```text
-~/.local/state/yazi/tabs.dump
-```
-
-Default line format:
-
-```text
-<index> <active-or-> <tab-name> <cwd> <hovered-url-or->
-```
-
-Example:
-
-```text
-1 active projects /home/me/projects /home/me/projects/foo
-2 - Downloads /home/me/Downloads /home/me/Downloads/file\ with\ spaces.txt
-```
-
-Fields are escaped with backslashes:
-
-- space -> `\ `
-- backslash -> `\\`
-- tab -> `\t`
-- carriage return -> `\r`
-- newline -> `\n`
+1. Human/debug dump: a table with tab index, active tab, name, cwd, and hovered path.
+2. Restore dump: paths or a ready-to-run `yazi ...` command.
 
 ## Install
 
@@ -49,9 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/js0ny-bot/dump-tabs.yazi/main/main.
   -o ~/.config/yazi/plugins/dump-tabs.yazi/main.lua
 ```
 
-## Keymap
-
-Add this to `~/.config/yazi/keymap.toml`:
+## Basic keymap
 
 ```toml
 [[mgr.prepend_keymap]]
@@ -60,23 +32,126 @@ run = "plugin dump-tabs"
 desc = "Dump all tabs to file"
 ```
 
-## Options
+Default output path:
+
+```text
+~/.local/state/yazi/tabs.dump
+```
+
+Default format is `table`:
+
+```text
+<index> <active-or-> <tab-name> <cwd> <hovered-url-or->
+```
+
+Example:
+
+```text
+1 - home /home/user /home/user/.config
+2 active project /home/user/project /home/user/project/src
+3 - docs /home/user/docs /home/user/docs/notes
+```
+
+Fields in `table` format are backslash-escaped for readability:
+
+- space -> `\ `
+- backslash -> `\\`
+- tab -> `\t`
+- carriage return -> `\r`
+- newline -> `\n`
+
+## Restore-friendly formats
+
+For reopening tabs, prefer one of these instead of parsing the default table.
+
+### `format=cmd`
+
+Writes a ready-to-run shell command:
+
+```toml
+[[mgr.prepend_keymap]]
+on = [ "<C-s>" ]
+run = "plugin dump-tabs -- --format=cmd"
+desc = "Dump tabs as yazi command"
+```
+
+Output:
+
+```sh
+yazi '/home/user/.config' '/home/user/project/src' '/home/user/docs/notes'
+```
+
+Run it with:
+
+```sh
+sh ~/.local/state/yazi/tabs.dump
+```
+
+or inspect first:
+
+```sh
+cat ~/.local/state/yazi/tabs.dump
+```
+
+### `format=nul`
+
+Writes NUL-separated paths for robust machine parsing:
+
+```toml
+[[mgr.prepend_keymap]]
+on = [ "<C-s>" ]
+run = "plugin dump-tabs -- --format=nul"
+desc = "Dump tabs as NUL-separated paths"
+```
+
+Default output path for this mode:
+
+```text
+~/.local/state/yazi/tabs.nul
+```
+
+Restore with:
+
+```sh
+xargs -0 yazi < ~/.local/state/yazi/tabs.nul
+```
+
+This is the safest format for paths containing spaces, quotes, or other shell metacharacters.
+
+### `format=lines`
+
+Writes one path per line:
+
+```toml
+[[mgr.prepend_keymap]]
+on = [ "<C-s>" ]
+run = "plugin dump-tabs -- --format=lines"
+desc = "Dump tabs as one path per line"
+```
+
+Restore only if your paths do not contain newlines:
+
+```sh
+xargs -d '\n' yazi < ~/.local/state/yazi/tabs.dump
+```
+
+## Other options
 
 Custom output path:
 
 ```toml
 [[mgr.prepend_keymap]]
 on = [ "<C-A-s>" ]
-run = "plugin dump-tabs --output=/tmp/yazi-tabs.dump"
+run = "plugin dump-tabs -- --format=cmd --output=/tmp/yazi-tabs.sh"
 desc = "Dump all tabs to /tmp"
 ```
 
-Custom separator:
+Custom separator for `table` format:
 
 ```toml
 [[mgr.prepend_keymap]]
 on = [ "<C-A-s>" ]
-run = "plugin dump-tabs --sep=| --output=/tmp/yazi-tabs.dump"
+run = "plugin dump-tabs -- --format=table --sep=| --output=/tmp/yazi-tabs.dump"
 desc = "Dump all tabs with pipe separator"
 ```
 
@@ -85,7 +160,7 @@ Debug mode:
 ```toml
 [[mgr.prepend_keymap]]
 on = [ "<C-S-s>" ]
-run = "plugin dump-tabs --debug"
+run = "plugin dump-tabs -- --debug"
 desc = "Dump all tabs with debug notifications"
 ```
 
@@ -94,8 +169,6 @@ Debug mode does three things:
 1. Shows short notifications for each stage: start, collect, ensure output dir, write, done.
 2. Writes messages with `ya.dbg()` to Yazi's log when Yazi is started with `YAZI_LOG=debug`.
 3. Wraps collection errors with `pcall()` and reports them via `ya.notify()` / `ya.err()` instead of failing silently.
-
-Implementation note: the plugin runs its `entry` function in sync mode to read `cx.tabs` directly, then switches to `ya.async()` only for file I/O. This avoids failures from `ya.sync()` blocks on setups where cross-context collection is brittle.
 
 For logs, start Yazi like this:
 
@@ -111,6 +184,6 @@ Then inspect:
 
 ## Notes
 
-This plugin dumps the visible tab state exposed by Yazi's Lua context API: tab index, active tab, tab name, cwd, and hovered URL.
+For each tab, restore-oriented formats use the hovered URL if present; otherwise they fall back to the tab cwd.
 
-It does **not** dump Yazi's internal back/forward history stack because that state is not currently exposed to Lua plugins.
+This plugin does **not** dump Yazi's internal back/forward history stack because that state is not currently exposed to Lua plugins.
