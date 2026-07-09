@@ -12,14 +12,14 @@ It has two main use cases:
 With Yazi's package manager:
 
 ```sh
-ya pkg add js0ny-bot/dump-tabs.yazi
+ya pkg add js0ny/dump-tabs.yazi
 ```
 
 Or manually:
 
 ```sh
 mkdir -p ~/.config/yazi/plugins/dump-tabs.yazi
-curl -fsSL https://raw.githubusercontent.com/js0ny-bot/dump-tabs.yazi/main/main.lua \
+curl -fsSL https://raw.githubusercontent.com/js0ny/dump-tabs.yazi/main/main.lua \
   -o ~/.config/yazi/plugins/dump-tabs.yazi/main.lua
 ```
 
