@@ -7,21 +7,43 @@ It has two main use cases:
 1. Human/debug dump: a table with tab index, active tab, name, cwd, and hovered path.
 2. Restore dump: paths or a ready-to-run `yazi ...` command.
 
+> [!WARNING]
+> The code of this project is mainly LLM Generated, with basic manual audit, use it with caution.
+
 ## Install
 
 With Yazi's package manager:
 
 ```sh
-ya pkg add js0ny/dump-tabs.yazi
+ya pkg add js0ny/dump-tabs
 ```
 
-Or manually:
+With Home-Manager:
 
-```sh
-mkdir -p ~/.config/yazi/plugins/dump-tabs.yazi
-curl -fsSL https://raw.githubusercontent.com/js0ny/dump-tabs.yazi/main/main.lua \
-  -o ~/.config/yazi/plugins/dump-tabs.yazi/main.lua
+```nix
+{ pkgs, ... }: {
+  programs.yazi.plugins = {
+    dump-tabs = (
+      pkgs.stdenvNoCC.mkDerivation {
+        pname = "dump-tabs";
+        version = "0ef7b5540f5eef0a2876ebd0d3e8dd24c4b143cb"; 
+        src = pkgs.fetchFromGitHub {
+          owner = "js0ny";
+          repo = "dump-tabs.yazi";
+          rev = "0ef7b5540f5eef0a2876ebd0d3e8dd24c4b143cb"; # replace with current commit hash
+          hash = "sha256-EGQBHqz1nJJYRRMbotr6TeKg+rWdVzcpyi2ni7AdeCo="; # needs to recalculate
+        };
+        installPhase = ''
+          runHook preInstall
+          cp -r . $out
+          runHook postInstall
+        '';
+      }
+    );
+  };
+}
 ```
+
 
 ## Basic keymap
 
@@ -181,9 +203,3 @@ Then inspect:
 ```sh
 ~/.local/state/yazi/yazi.log
 ```
-
-## Notes
-
-For each tab, restore-oriented formats use the hovered URL if present; otherwise they fall back to the tab cwd.
-
-This plugin does **not** dump Yazi's internal back/forward history stack because that state is not currently exposed to Lua plugins.
