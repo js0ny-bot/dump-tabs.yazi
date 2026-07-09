@@ -60,8 +60,7 @@ local function debug_log(enabled, message)
 end
 
 local function tab_target(tab)
-  local hovered = tab.current.hovered
-  return hovered and tostring(hovered.url) or tostring(tab.current.cwd)
+  return tostring(tab.current.cwd)
 end
 
 local function collect_table(sep)
