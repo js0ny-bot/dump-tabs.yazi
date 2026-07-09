@@ -1,8 +1,13 @@
 --- @sync entry
 
 local function default_output(format)
+  local state_home = os.getenv('XDG_STATE_HOME')
   local home = os.getenv('HOME')
   local name = format == 'nul' and 'tabs.nul' or 'tabs.dump'
+  if state_home and state_home ~= '' then
+    return state_home .. '/yazi/' .. name
+  end
+
   if home and home ~= '' then
     return home .. '/.local/state/yazi/' .. name
   end
