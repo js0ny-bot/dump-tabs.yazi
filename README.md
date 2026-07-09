@@ -95,6 +95,8 @@ Debug mode does three things:
 2. Writes messages with `ya.dbg()` to Yazi's log when Yazi is started with `YAZI_LOG=debug`.
 3. Wraps collection errors with `pcall()` and reports them via `ya.notify()` / `ya.err()` instead of failing silently.
 
+Implementation note: the plugin runs its `entry` function in sync mode to read `cx.tabs` directly, then switches to `ya.async()` only for file I/O. This avoids failures from `ya.sync()` blocks on setups where cross-context collection is brittle.
+
 For logs, start Yazi like this:
 
 ```sh
