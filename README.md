@@ -80,6 +80,33 @@ run = "plugin dump-tabs --sep=| --output=/tmp/yazi-tabs.dump"
 desc = "Dump all tabs with pipe separator"
 ```
 
+Debug mode:
+
+```toml
+[[mgr.prepend_keymap]]
+on = [ "<C-S-s>" ]
+run = "plugin dump-tabs --debug"
+desc = "Dump all tabs with debug notifications"
+```
+
+Debug mode does three things:
+
+1. Shows short notifications for each stage: start, collect, ensure output dir, write, done.
+2. Writes messages with `ya.dbg()` to Yazi's log when Yazi is started with `YAZI_LOG=debug`.
+3. Wraps collection errors with `pcall()` and reports them via `ya.notify()` / `ya.err()` instead of failing silently.
+
+For logs, start Yazi like this:
+
+```sh
+YAZI_LOG=debug yazi
+```
+
+Then inspect:
+
+```sh
+~/.local/state/yazi/yazi.log
+```
+
 ## Notes
 
 This plugin dumps the visible tab state exposed by Yazi's Lua context API: tab index, active tab, tab name, cwd, and hovered URL.
